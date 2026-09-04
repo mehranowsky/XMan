@@ -45,8 +45,7 @@ if __name__ == "__main__":
     
     code_blocks = extract_all_code_blocks(response)
     
-    if not code_blocks:
-        print("❌ No code blocks found. The AI didn't provide code in ``` blocks.")
+    if not code_blocks:        
         print("📝 AI Response was:\n", response)
         sys.exit(0)
     
