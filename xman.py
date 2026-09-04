@@ -24,18 +24,13 @@ def ask_ollama(prompt):
     except urllib.error.URLError:
         return "ERROR: Ollama is not running! Start it with 'ollama serve'."
 
-def extract_code(text):
-    """Extract code from markdown blocks (```python ... ```)"""
-    # Look for code blocks
-    pattern = r'```(?:python)?\n(.*?)```'
+def extract_all_code_blocks(text):
+    """Extract all code blocks (```...```) from the text"""
+    # This finds everything between ``` and ```
+    pattern = r'```(?:\w+)?\n(.*?)```'
     matches = re.findall(pattern, text, re.DOTALL)
-    
-    if matches:
-        # Return the code inside the blocks
-        return "\n\n".join(matches).strip()
-    else:
-        # If no markdown, return the whole text (maybe it's just raw code)
-        return text.strip()
+    # Clean up trailing/leading whitespace
+    return [block.strip() for block in matches if block.strip()]
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -44,38 +39,54 @@ if __name__ == "__main__":
     
     prompt = " ".join(sys.argv[1:])
     
-    print(f"🧠 Thinking...\n")
+    print(f"🧠 Thinking... (this may take 10-30 seconds)\n")
     response = ask_ollama(prompt)
     
     if "ERROR" in response:
         print(response)
         sys.exit(1)
     
-    # 1. Show the AI's full response (so you see the explanation)
-    print("=" * 50)
+    # 1. Show the AI's full response
+    print("=" * 60)
     print("🤖 AI RESPONSE:")
-    print("=" * 50)
+    print("=" * 60)
     print(response)
-    print("=" * 50)
+    print("=" * 60)
     
-    # 2. Extract only the code
-    code_only = extract_code(response)
+    # 2. Extract ALL code blocks
+    code_blocks = extract_all_code_blocks(response)
     
-    if not code_only:
-        print("ℹ️ No code detected in the response. Nothing to save.")
+    if not code_blocks:
+        print("ℹ️ No code blocks detected. Nothing to save.")
         sys.exit(0)
     
-    # 3. Ask if they want to save the extracted code
-    print("\n📄 Extracted Code Preview:")
-    print("-" * 40)
-    print(code_only[:500] + ("..." if len(code_only) > 500 else ""))
-    print("-" * 40)
+    print(f"\n📦 Found {len(code_blocks)} code block(s) in the response.\n")
     
-    save_choice = input("💾 Save this code to a file? (Enter filename, or press Enter to skip): ").strip()
+    # 3. Loop through each block and ask for a filename
+    saved_count = 0
+    for i, block in enumerate(code_blocks, 1):
+        print(f"--- Block #{i} Preview ---")
+        # Show first 200 chars of the block so they know what it is
+        preview = block[:200] + ("..." if len(block) > 200 else "")
+        print(preview)
+        print("-------------------------")
+        
+        # Ask what to name this specific file
+        filename = input(f"💾 Enter filename for Block #{i} (or press Enter to skip): ").strip()
+        
+        if filename:
+            # Check if it has an extension, if not, add .py
+            if '.' not in filename:
+                filename += '.py'
+            
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(block)
+            print(f"   ✅ Saved to: {filename}\n")
+            saved_count += 1
+        else:
+            print(f"   ⏭️ Skipped Block #{i}\n")
     
-    if save_choice:
-        with open(save_choice, "w", encoding="utf-8") as f:
-            f.write(code_only)
-        print(f"✅ Code saved to: {save_choice}")
+    if saved_count == 0:
+        print("❌ No files were saved.")
     else:
-        print("❌ File not saved.")
+        print(f"🎉 Done! Saved {saved_count} file(s).")
